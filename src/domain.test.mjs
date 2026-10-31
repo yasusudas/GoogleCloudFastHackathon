@@ -4,8 +4,8 @@ import { sampleState, monthTotal, computeTotals, unitPriceReport, suggestions, f
 
 test('sample data uses neutral names', () => {
   const s = sampleState();
-  assert.equal(s.householdName, 'サンプル家族');
-  assert.equal(s.members.find((m) => m.id === s.selfId).name, 'メンバーA');
+  assert.equal(s.householdName, '青葉家');
+  assert.equal(s.members.find((m) => m.id === s.selfId).name, 'はると');
   assert.ok(!JSON.stringify(s).includes('しゅう') && !JSON.stringify(s).includes('山本家'));
 });
 
@@ -17,8 +17,8 @@ test('legacy saved names are renamed; receipts and amounts are kept', () => {
   const before = JSON.stringify(legacy.receipts);
   const { state, changed } = migrateState(legacy);
   assert.equal(changed, true);
-  assert.equal(state.householdName, 'サンプル家族');
-  assert.equal(state.members[0].name, 'メンバーA');
+  assert.equal(state.householdName, '青葉家');
+  assert.equal(state.members[0].name, 'はると');
   assert.deepEqual(state.members.slice(1), legacy.members.slice(1));
   assert.equal(JSON.stringify(state.receipts), before);
   assert.equal(state.budget, 123456);
@@ -45,8 +45,8 @@ test('loadState migrates existing localStorage and writes it back', () => {
   store.set('receipt-kakeibo:v1', JSON.stringify(legacy));
   const { state, error } = loadState();
   assert.equal(error, null);
-  assert.equal(state.householdName, 'サンプル家族');
-  assert.equal(state.members[0].name, 'メンバーA');
+  assert.equal(state.householdName, '青葉家');
+  assert.equal(state.members[0].name, 'はると');
   assert.equal(state.receipts.length, legacy.receipts.length);
   const saved = store.get('receipt-kakeibo:v1');
   assert.ok(!saved.includes('しゅう') && !saved.includes('山本家'));

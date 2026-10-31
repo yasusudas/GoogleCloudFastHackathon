@@ -3,8 +3,8 @@
 export const CATEGORIES = { food: '食料品', daily: '日用品', dining: '外食', transport: '交通', personal: 'お小遣い', other: 'その他' };
 export const UNITS = { piece: '個', g: 'g', ml: 'ml', pack: 'パック', unknown: '不明' };
 const STORAGE_KEY = 'receipt-kakeibo:v1';
-export const SAMPLE_HOUSEHOLD = 'サンプル家族';
-export const SAMPLE_SELF = 'メンバーA';
+export const SAMPLE_HOUSEHOLD = '青葉家';
+export const SAMPLE_SELF = 'はると';
 
 export const yen = (n) => (n < 0 ? '−¥' : '¥') + Math.abs(Math.round(n)).toLocaleString('ja-JP');
 export const ymOf = (date) => date.slice(0, 7);
@@ -216,9 +216,9 @@ const LEGACY_SELF = 'しゅう';
 export function migrateState(s) {
   let changed = false;
   let next = s;
-  if (s.householdName === LEGACY_HOUSEHOLD) { next = { ...next, householdName: SAMPLE_HOUSEHOLD }; changed = true; }
-  if (Array.isArray(s.members) && s.members.some((m) => m.id === s.selfId && m.name === LEGACY_SELF)) {
-    next = { ...next, members: s.members.map((m) => (m.id === s.selfId && m.name === LEGACY_SELF ? { ...m, name: SAMPLE_SELF } : m)) };
+  if ([LEGACY_HOUSEHOLD, 'サンプル家族'].includes(s.householdName)) { next = { ...next, householdName: SAMPLE_HOUSEHOLD }; changed = true; }
+  if (Array.isArray(s.members) && s.members.some((m) => m.id === s.selfId && [LEGACY_SELF, 'メンバーA'].includes(m.name))) {
+    next = { ...next, members: s.members.map((m) => (m.id === s.selfId && [LEGACY_SELF, 'メンバーA'].includes(m.name) ? { ...m, name: SAMPLE_SELF } : m)) };
     changed = true;
   }
   return { state: next, changed };
