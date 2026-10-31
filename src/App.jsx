@@ -506,6 +506,18 @@ function Suggest({ state, commit }) {
 function Family({ state, commit, toast, api }) {
   const ym = ymOf(todayISO());
   const [sheet, setSheet] = useState(null);
+  const invite = state.demoInvite;
+  const issueInvite = () => {
+    const code = 'FAM-' + crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase();
+    if (commit({ ...state, demoInvite: { code, createdAt: Date.now() } }, '仮の招待コードを発行しました')) {
+      requestAnimationFrame(() => document.getElementById('invite')?.scrollIntoView({ behavior: 'smooth' }));
+    }
+  };
+  const copyInvite = async () => {
+    if (!invite) return;
+    try { await navigator.clipboard.writeText(invite.code); toast('招待コードをコピーしました'); }
+    catch { toast('コピーできませんでした。表示されたコードを選択してコピーしてください'); }
+  };
   const fam = state.receipts.filter((r) => r.visibility === 'family' && ymOf(r.date) === ym);
   const total = fam.reduce((s, r) => s + familyAmount(r, state.settings), 0);
   const per = state.members.map((m) => {
@@ -517,7 +529,7 @@ function Family({ state, commit, toast, api }) {
   return (<>
     <header className="topbar">
       <h1 className="title-l">家族</h1>
-      <button className="iconbtn" aria-label="家族を招待" onClick={() => document.getElementById('invite')?.scrollIntoView({ behavior: 'smooth' })}><Icon n="person_add" /></button>
+      <button className="iconbtn" aria-label="家族を招待" onClick={issueInvite}><Icon n="person_add" /></button>
       <button className="iconbtn" aria-label="設定" onClick={() => setSheet('settings')}><Icon n="settings" /></button>
     </header>
     <main className="content with-nav">
@@ -552,14 +564,14 @@ function Family({ state, commit, toast, api }) {
       <section id="invite" className="primcard col gap12" style={{ borderRadius: 24, padding: '16px 20px' }}>
         <h2 className="title-m" style={{ margin: 0 }}>家族を招待</h2>
         <div className="row between" style={{ background: 'var(--surface-container-lowest)', borderRadius: 14, padding: '6px 8px 6px 16px' }}>
-          <span className="num-headline var" style={{ letterSpacing: 2 }}>未発行</span>
-          <button className="iconbtn" disabled aria-label="招待コードをコピー（未発行）" style={{ opacity: .38 }}><Icon n="content_copy" /></button>
+          <span className="num-title" style={{ letterSpacing: 1, overflowWrap: 'anywhere', userSelect: 'all' }}>{invite?.code || '未発行'}</span>
+          <button className="iconbtn" disabled={!invite} onClick={copyInvite} aria-label="招待コードをコピー" style={{ opacity: invite ? 1 : .38 }}><Icon n="content_copy" /></button>
         </div>
         <div className="row gap8">
-          <button className="btn filled" onClick={() => toast('家族共有サーバーが未接続のため、招待リンクはまだ発行できません')}><Icon n="share" s={18} />リンクを共有</button>
-          <button className="btn outlined" style={{ background: 'var(--surface-container-lowest)' }} onClick={() => toast('家族共有サーバーが未接続のため、QRコードはまだ発行できません')}><Icon n="qr_code_2" s={18} />QRコード</button>
+          <button className="btn filled" onClick={issueInvite}><Icon n="person_add" s={18} />{invite ? 'コードを再発行' : '招待コードを発行'}</button>
+          {invite && <button className="btn outlined" onClick={copyInvite}>コピー</button>}
         </div>
-        <p className="body-s">家族アカウントの認証・同期は未接続です。記録はこの端末だけに保存されます。</p>
+        <p className="body-s">デモ用の仮コードです。実際のグループ参加・家族間の同期にはまだ使えません。</p>
       </section>
     </main>
     {sheet === 'settings' && <SettingsSheet state={state} commit={commit} api={api} hasSample={hasSample} onClose={() => setSheet(null)} />}
