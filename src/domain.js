@@ -3,6 +3,8 @@
 export const CATEGORIES = { food: '食料品', daily: '日用品', dining: '外食', transport: '交通', personal: 'お小遣い', other: 'その他' };
 export const UNITS = { piece: '個', g: 'g', ml: 'ml', pack: 'パック', unknown: '不明' };
 const STORAGE_KEY = 'receipt-kakeibo:v1';
+export const SAMPLE_HOUSEHOLD = 'サンプル家族';
+export const SAMPLE_SELF = 'メンバーA';
 
 export const yen = (n) => (n < 0 ? '−¥' : '¥') + Math.abs(Math.round(n)).toLocaleString('ja-JP');
 export const ymOf = (date) => date.slice(0, 7);
@@ -175,7 +177,7 @@ export function sampleState() {
     parts.forEach((amt, i) => tracked.push(receipt(`${ym}-${10 + i * 5}`, ['ライフ 野田店', '業務スーパー 福島店', 'ローソン 野田駅前店'][i], payers[i], [filler(amt)])));
     R.push(...tracked);
   }
-  // October: per-member family totals しゅう 32,180 / 母 41,060 / 父 13,180
+  // October: per-member family totals メンバーA 32,180 / 母 41,060 / 父 13,180
   const oct = [
     receipt('2026-10-08', '業務スーパー 福島店', 'mom', [egg(198), milk(178), milk(178)]),
     receipt('2026-10-12', 'スギ薬局', 'dad', [soap(178)]),
@@ -195,9 +197,9 @@ export function sampleState() {
   }
   R.push(...oct);
   return {
-    version: 1, selfId: 'me', householdName: '山本家', budget: 100000,
+    version: 1, selfId: 'me', householdName: SAMPLE_HOUSEHOLD, budget: 100000,
     members: [
-      { id: 'me', name: 'しゅう', tone: 'primary', role: 'admin', sample: false },
+      { id: 'me', name: SAMPLE_SELF, tone: 'primary', role: 'admin', sample: false },
       { id: 'mom', name: '母', tone: 'tertiary', role: 'member', sample: true },
       { id: 'dad', name: '父', tone: 'caution', role: 'member', sample: true },
     ],
@@ -207,13 +209,31 @@ export function sampleState() {
 }
 
 // ---- persistence ----------------------------------------------------------
+// Earlier builds seeded real-looking names. Rename only those exact seeded values;
+// names the user chose and all receipts/amounts are left untouched.
+const LEGACY_HOUSEHOLD = '山本家';
+const LEGACY_SELF = 'しゅう';
+export function migrateState(s) {
+  let changed = false;
+  let next = s;
+  if (s.householdName === LEGACY_HOUSEHOLD) { next = { ...next, householdName: SAMPLE_HOUSEHOLD }; changed = true; }
+  if (Array.isArray(s.members) && s.members.some((m) => m.id === s.selfId && m.name === LEGACY_SELF)) {
+    next = { ...next, members: s.members.map((m) => (m.id === s.selfId && m.name === LEGACY_SELF ? { ...m, name: SAMPLE_SELF } : m)) };
+    changed = true;
+  }
+  return { state: next, changed };
+}
+
 export function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { state: sampleState(), error: null };
     const s = JSON.parse(raw);
     if (s.version !== 1 || !Array.isArray(s.receipts)) throw new Error('bad');
-    return { state: s, error: null };
+    const { state, changed } = migrateState(s);
+    // Best effort: if writing back fails, the renamed state is still shown and retried on the next save.
+    if (changed) saveState(state);
+    return { state, error: null };
   } catch {
     return { state: sampleState(), error: '保存データを読み込めませんでした。サンプルで表示しています。' };
   }
