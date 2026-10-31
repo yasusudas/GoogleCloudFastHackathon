@@ -1,0 +1,7 @@
+.git
+.claude
+.env*
+node_modules
+slides
+server/*.test.mjs
+README.md
