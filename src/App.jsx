@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   CATEGORIES, UNITS, yen, ymOf, todayISO, addMonths, monthLabel, shortDate, computeTotals, receiptIssues, lineAmount,
   monthTotal, scopedReceipts, scopedAmount, familyAmount, unitPriceReport, suggestions, loadState, saveState, sampleState,
-  draftFromApi, emptyDraft, newItem,
+  emptyDraft, newItem,
 } from './domain.js';
-import { health, extractReceipt } from './api.js';
 
 const Icon = ({ n, s, className = '' }) => <span aria-hidden="true" className={`ms ${s ? 's' + s : ''} ${className}`}>{n}</span>;
 const Gemini = () => <span className="gemini"><Icon n="auto_awesome" s={16} /><span className="t">Gemini</span></span>;
@@ -40,10 +39,6 @@ export default function App() {
   const [state, setState] = useState(initial);
   const [snack, setSnack] = useState(loadErr);
   const [draft, setDraft] = useState(null);
-  const [capture, setCapture] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [api, setApi] = useState({ ok: false, geminiConfigured: false, checked: false });
-  useEffect(() => { health().then((h) => setApi({ ...h, checked: true })); }, []);
   useEffect(() => { if (!snack) return; const t = setTimeout(() => setSnack(null), 5000); return () => clearTimeout(t); }, [snack]);
 
   // Persist first; only update UI state if the device save succeeded.
@@ -54,61 +49,27 @@ export default function App() {
   };
   const toast = setSnack;
 
-  const startManual = () => { setCapture(false); setDraft({ ...emptyDraft(state.selfId, state.settings.defaultVisibility), preview: null }); go('/edit'); };
-  const startScan = async (file) => {
-    setCapture(false);
-    if (!file) return;
-    setBusy(true);
-    try {
-      const res = await extractReceipt(file);
-      setDraft({ ...draftFromApi(res, state.selfId, state.settings.defaultVisibility), preview: res.preview });
-      go('/edit');
-    } catch (e) {
-      setDraft({ ...emptyDraft(state.selfId, state.settings.defaultVisibility), preview: null, warnings: [`自動読み取りに失敗しました：${e.message}`] });
-      go('/edit');
-    } finally { setBusy(false); }
-  };
+  const startManual = () => { setDraft({ ...emptyDraft(state.selfId, state.settings.defaultVisibility), preview: null }); go('/edit'); };
   const editExisting = (r) => { setDraft(structuredClone({ ...r, preview: null })); go('/edit'); };
 
   const base = route.split('?')[0];
   let screen;
-  if (base === '/edit' && draft) screen = <Editor draft={draft} setDraft={setDraft} state={state} commit={commit} toast={toast} onRetake={() => setCapture(true)} />;
+  if (base === '/edit' && draft) screen = <Editor draft={draft} setDraft={setDraft} state={state} commit={commit} toast={toast} />;
   else if (base === '/receipts') screen = <Receipts state={state} onOpen={editExisting} />;
   else if (base === '/report') screen = <Report state={state} />;
   else if (base === '/suggest') screen = <Suggest state={state} commit={commit} />;
-  else if (base === '/family') screen = <Family state={state} commit={commit} toast={toast} api={api} />;
+  else if (base === '/family') screen = <Family state={state} commit={commit} toast={toast} />;
   else screen = <Home state={state} onOpen={editExisting} />;
   const showNav = base !== '/edit' || !draft;
 
   return (
     <div className="app">
+      <div className="archive-notice body-s" role="note"><Icon n="inventory_2" s={16} />作品アーカイブ · AI読み取り停止中</div>
       {screen}
-      {showNav && base === '/' && <button className="fab" onClick={() => setCapture(true)}><Icon n="photo_camera" /><span className="label-l">レシートを撮る</span></button>}
+      {showNav && base === '/' && <button className="fab" onClick={startManual}><Icon n="edit_note" /><span className="label-l">レシートを入力</span></button>}
       {showNav && <NavBar active={NAV.some(([p]) => p === base) ? base : '/'} />}
-      {capture && <CaptureSheet api={api} onClose={() => setCapture(false)} onFile={startScan} onManual={startManual} />}
-      {busy && <div className="loading" role="status" aria-live="polite"><div className="spin" /><p className="title-m">Geminiで読み取り中…</p><p className="body-m var">読み取り後に内容を確認・修正してから保存します</p></div>}
       {snack && <div className="snackbar" role="status" aria-live="polite">{snack}</div>}
     </div>
-  );
-}
-
-/* ---------------- capture ---------------- */
-function CaptureSheet({ api, onClose, onFile, onManual }) {
-  const cam = useRef(null), lib = useRef(null);
-  const ready = api.ok && api.geminiConfigured;
-  return (
-    <div className="sheet" onClick={onClose}><div role="dialog" aria-modal="true" aria-label="レシートを記録" onClick={(e) => e.stopPropagation()}>
-      <div className="handle" />
-      <div className="col gap8">
-        <p className="title-m" style={{ padding: '4px 0 8px' }}>レシートを記録</p>
-        {!ready && api.checked && <div className="banner caution"><Icon n="info" /><p className="body-m">読み取りAPIに接続できません（{api.ok ? 'Gemini未設定' : 'サーバー未起動'}）。手入力で記録できます。</p></div>}
-        <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onFile(e.target.files[0])} />
-        <input ref={lib} type="file" accept="image/jpeg,image/png,image/webp,image/*" hidden onChange={(e) => onFile(e.target.files[0])} />
-        <button className="listitem tap" disabled={!ready} style={{ opacity: ready ? 1 : .38 }} onClick={() => cam.current.click()}><span className="leading"><Icon n="photo_camera" /></span><span className="body-l grow">撮影して読み取る</span><Gemini /></button>
-        <button className="listitem tap" disabled={!ready} style={{ opacity: ready ? 1 : .38 }} onClick={() => lib.current.click()}><span className="leading"><Icon n="image" /></span><span className="body-l grow">画像を選んで読み取る</span></button>
-        <button className="listitem tap" onClick={onManual}><span className="leading"><Icon n="edit_note" /></span><span className="body-l grow">手入力する</span></button>
-      </div>
-    </div></div>
   );
 }
 
@@ -210,7 +171,7 @@ function Receipts({ state, onOpen }) {
 }
 
 /* ---------------- 02 receipt review / edit ---------------- */
-function Editor({ draft, setDraft, state, commit, toast, onRetake }) {
+function Editor({ draft, setDraft, state, commit, toast }) {
   const [editing, setEditing] = useState(null);
   const [head, setHead] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -303,8 +264,7 @@ function Editor({ draft, setDraft, state, commit, toast, onRetake }) {
       </div>
     </main>
     <div className="actionbar">
-      {draft.source === 'gemini' ? <button className="btn outlined" onClick={onRetake}><Icon n="photo_camera" s={18} />撮り直す</button>
-        : <button className="btn outlined" onClick={() => setEditing(newItem())}><Icon n="add" s={18} />品目</button>}
+      <button className="btn outlined" onClick={() => setEditing(newItem())}><Icon n="add" s={18} />品目</button>
       <button className="btn filled grow" onClick={save}><Icon n="check" s={18} />{existing ? '変更を保存' : '家計簿に保存'}</button>
     </div>
     {editing && <ItemSheet item={editing} onClose={() => setEditing(null)}
@@ -503,7 +463,7 @@ function Suggest({ state, commit }) {
 }
 
 /* ---------------- 05 family ---------------- */
-function Family({ state, commit, toast, api }) {
+function Family({ state, commit, toast }) {
   const ym = ymOf(todayISO());
   const [sheet, setSheet] = useState(null);
   const invite = state.demoInvite;
@@ -574,11 +534,11 @@ function Family({ state, commit, toast, api }) {
         <p className="body-s">デモ用の仮コードです。実際のグループ参加・家族間の同期にはまだ使えません。</p>
       </section>
     </main>
-    {sheet === 'settings' && <SettingsSheet state={state} commit={commit} api={api} hasSample={hasSample} onClose={() => setSheet(null)} />}
+    {sheet === 'settings' && <SettingsSheet state={state} commit={commit} hasSample={hasSample} onClose={() => setSheet(null)} />}
   </>);
 }
 
-function SettingsSheet({ state, commit, api, hasSample, onClose }) {
+function SettingsSheet({ state, commit, hasSample, onClose }) {
   const [f, setF] = useState({ householdName: state.householdName, budget: String(state.budget), myName: state.members.find((m) => m.id === state.selfId)?.name ?? '' });
   const [err, setErr] = useState('');
   const submit = (e) => {
@@ -607,7 +567,8 @@ function SettingsSheet({ state, commit, api, hasSample, onClose }) {
         </div>
         {err && <p className="body-m err" role="alert">{err}</p>}
         <div className="banner info"><Icon n="cloud_off" /><div className="col gap2 body-m">
-          <p>レシート読み取り：{api.ok ? (api.geminiConfigured ? 'Gemini 接続済み（ローカルAPI）' : 'API起動中・Gemini未設定') : 'APIに接続できません'}</p>
+          <p>作品アーカイブ：AI読み取りは停止しています。</p>
+          <p>サンプルの閲覧と手入力を利用できます。記録はこのブラウザ内にのみ保存されます。</p>
           <p>家族アカウント・同期：未接続（この端末にのみ保存）</p></div></div>
         <div className="row gap8" style={{ flexWrap: 'wrap' }}>
           {hasSample && <button type="button" className="btn outlined" onClick={clearSample}><Icon n="delete" s={18} />サンプルを削除</button>}

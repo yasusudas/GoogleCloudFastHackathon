@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sampleState, monthTotal, computeTotals, unitPriceReport, suggestions, familyAmount, draftFromApi, receiptIssues, migrateState, loadState } from './domain.js';
+import { sampleState, monthTotal, computeTotals, unitPriceReport, suggestions, familyAmount, draftFromApi, receiptIssues, migrateState, loadState, saveState } from './domain.js';
 
 test('sample data uses neutral names', () => {
   const s = sampleState();
@@ -79,6 +79,30 @@ test('unit price report and history-based suggestions', () => {
   assert.ok(u.rows.some((r) => r.name === '卵 Mサイズ' && r.saved > 0));
   const sg = suggestions(s, '2026-10-31');
   assert.ok(sg.some((x) => x.bestStore === '業務スーパー 福島店'));
+});
+
+test('reserved object keys work as store names after saving and reloading', (t) => {
+  const store = new Map();
+  const previous = globalThis.localStorage;
+  globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+  t.after(() => { if (previous === undefined) delete globalThis.localStorage; else globalThis.localStorage = previous; });
+  for (const storeName of ['constructor', 'toString', '__proto__']) {
+    const state = sampleState();
+    const template = state.receipts.find(r => r.items.some(i => i.comparisonQuantity));
+    const item = template.items.find(i => i.comparisonQuantity);
+    const make = (id, date, shop, price) => ({ ...template, id, date, storeName: shop, sample: false,
+      items: [{ ...item, unitPrice: price, quantity: 1, discount: 0, needsReview: false }] });
+    state.receipts = [make('a', '2026-10-01', storeName, 300), make('b', '2026-10-10', storeName, 300), make('c', '2026-10-20', '別の店', 200)];
+    assert.equal(saveState(state), null);
+    const loaded = loadState();
+    assert.equal(loaded.error, null);
+    const result = suggestions(loaded.state, '2026-10-31');
+    assert.equal(result.length, 1);
+    assert.equal(result[0].usualStore, storeName);
+    assert.equal(result[0].bestStore, '別の店');
+    assert.equal(result[0].diff, 100);
+    assert.equal(monthTotal(loaded.state, '2026-10'), 800);
+  }
 });
 
 test('API response converts to a draft that requires confirmation', () => {

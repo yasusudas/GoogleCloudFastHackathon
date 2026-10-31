@@ -129,7 +129,7 @@ export function suggestions(state, today = todayISO()) {
   const out = [];
   for (const key of new Set(recs.map((x) => x.key))) {
     const rows = recs.filter((x) => x.key === key).sort((a, z) => a.date.localeCompare(z.date));
-    const byStore = {};
+    const byStore = Object.create(null);
     for (const x of rows) (byStore[x.store] ||= []).push(x);
     const stores = Object.entries(byStore).map(([store, xs]) => ({ store, count: xs.length, latest: xs[xs.length - 1] }));
     if (stores.length < 2) continue;

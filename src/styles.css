@@ -42,6 +42,7 @@ p { margin: 0; }
 
 /* shell */
 .app { max-width: 480px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; background: var(--surface); position: relative; }
+.archive-notice { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; background: var(--surface-container-high); color: var(--on-surface-variant); }
 .topbar { display: flex; align-items: center; gap: 4px; min-height: 64px; padding: env(safe-area-inset-top) 8px 0 20px; }
 .topbar.home { padding: calc(8px + env(safe-area-inset-top)) 16px 8px 20px; min-height: 68px; }
 .topbar.back { padding-left: 4px; }

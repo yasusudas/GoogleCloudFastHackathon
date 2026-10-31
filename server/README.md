@@ -1,21 +1,20 @@
-# レシート読み取りAPI
+# 作品アーカイブ
 
-Node.js 22以上の組み込みモジュールだけで起動できる、ローカル開発用APIです。フロントエンドとは別プロセスです。
+現在の公開版は、サンプルの閲覧とブラウザ内への手入力・編集・集計を提供します。実際の家族アカウント・同期機能はありません。
 
-```sh
-GEMINI_ENV_FILE=/absolute/path/to/private/gemini.env node server/index.mjs
-```
+AI読み取りはフロントエンド・公開API・ローカルAPIのすべてで停止しています。
 
-秘密ファイルはリポジトリ外に置き、`GEMINI_API_KEY`を設定します。ブラウザ向けの`VITE_`環境変数には入れません。キー・画像・レシート本文をログに出しません。画像はメモリ内で処理し、サーバーには保存しません。
+- `GET /api/health` は `mode: archive`、`geminiConfigured: false`、`extractionEnabled: false` を返します。
+- `/api/receipts/extract` は本文を処理せず、HTTP 410 / `ARCHIVE_READ_ONLY` を返します。
+- APIキーが環境に残っていても読み取りは再開しません。公開環境にはキーを設定しないでください。
+- `receipt.mjs` は制作時の抽出・検証ロジックを保管したものです。公開・ローカルのHTTPルートからは呼び出しません。テストでは通信をモックします。
 
-`GET /api/health`は設定有無だけを返します。
+## 開発と確認
 
-`POST /api/receipts/extract`は`application/json`の`{ mimeType, imageBase64 }`を受け取ります。JPEG/PNG/WebP、最大6MBです。`imageBase64`にdata URLの接頭辞を含めません。標準モデルは`gemini-3.8-flash`、`GEMINI_MODEL`で変更できます。
+`pnpm dev` でフロントエンドを起動できます。保存先はこのブラウザのlocalStorageで、サーバー起動やAPIキーは不要です。
 
-成功時は`{ receipt, warnings, computedSubtotal, computedTotal, requiresConfirmation: true, source: 'gemini', model }`です。`receipt`は`receipt.mjs`の`receiptSchema`に基づきます。店名や日付の空文字、金額のnullは不明を表し、利用者が確認・修正するまで確定しません。レシート合計と明細計算が一致しない場合は両方を維持し、警告します。
+API停止応答をローカルで確認する場合は `node server/index.mjs` を起動します。既定は `127.0.0.1:8788`（Viteのプロキシ先と同じ）です。
 
-値引きは商品ごとの`discount`と未配賦の`receiptDiscount`を分けます。`additionalTax`は合計に加算すべき外税だけ、`taxAmount`はレシートに印字された税額です。内税の二重加算を避けます。
+`pnpm test` で集計・永続化・API停止・従来の抽出検証の回帰テスト、`pnpm build` で本番ビルドを実行します。
 
-エラーは`{ error: { code, message } }`です。APIキーやGoogleの生エラーは返しません。CORSは開放せず、Viteなどの開発サーバーから`/api`を`http://127.0.0.1:8787`へプロキシしてください。外部公開用の認証・永続DBは含みません。
-
-公式仕様：[GenerateContent API](https://ai.google.dev/api/generate-content)、[構造化出力](https://ai.google.dev/gemini-api/docs/structured-output)、[画像入力](https://ai.google.dev/gemini-api/docs/image-understanding)。
+公開時はGemini環境変数を削除した状態で新規デプロイし、ヘルスチェックと読み取りAPIの410応答を確認してください。過去のデプロイURLも残るため、従来キーは無効のままにしてください。

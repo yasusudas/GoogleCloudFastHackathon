@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
-    "test": "node --test src/domain.test.mjs"
+    "test": "node --test src/domain.test.mjs server/*.test.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",
